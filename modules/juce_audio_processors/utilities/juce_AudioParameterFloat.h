@@ -134,6 +134,10 @@ public:
     /** Provides access to the parameter's range. */
     NormalisableRange<float> range;
 
+
+    //Unsure why this was private in the first place. It's a useful value to have. Modified for Quilio Engine
+    float getDefaultValue() const override;
+
 protected:
     /** Override this method if you are interested in receiving callbacks
         when the parameter value changes.
@@ -144,7 +148,6 @@ private:
     //==============================================================================
     float getValue() const override;
     void setValue (float newValue) override;
-    float getDefaultValue() const override;
     int getNumSteps() const override;
     String getText (float, int) const override;
     float getValueForText (const String&) const override;

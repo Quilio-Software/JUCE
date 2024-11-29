@@ -90,6 +90,9 @@ public:
     bool appliesToNote (int midiNoteNumber) override;
     bool appliesToChannel (int midiChannel) override;
 
+    int getMidiRootNote() const { return midiRootNote; }
+    float getSourceSampleRate() const { return sourceSampleRate; }
+
 private:
     //==============================================================================
     friend class SamplerVoice;

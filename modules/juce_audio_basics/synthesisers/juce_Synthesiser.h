@@ -66,7 +66,6 @@ public:
     /** The class is reference-counted, so this is a handy pointer class for it. */
     using Ptr = ReferenceCountedObjectPtr<SynthesiserSound>;
 
-
 private:
     //==============================================================================
     JUCE_LEAK_DETECTOR (SynthesiserSound)
