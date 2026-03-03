@@ -245,6 +245,10 @@ public:
 
     /** Returns true if this voice started playing its current note before the other voice did. */
     bool wasStartedBefore (const SynthesiserVoice& other) const noexcept;
+    
+    int getCurrentlyPlayingNote() { return currentlyPlayingNote; }
+    
+    int getCurrentSampleRate() { return currentSampleRate; }
 
 protected:
     /** Resets the state of this voice after a sound has finished playing.

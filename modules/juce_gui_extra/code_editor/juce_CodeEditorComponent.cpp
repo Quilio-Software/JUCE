@@ -462,8 +462,8 @@ CodeEditorComponent::CodeEditorComponent (CodeDocument& doc, CodeTokeniser* cons
     f.setTypefaceName (Font::getDefaultMonospacedFontName());
     setFont (f);
 
-    if (codeTokeniser != nullptr)
-        setColourScheme (codeTokeniser->getDefaultColourScheme());
+//    if (codeTokeniser != nullptr)
+//        setColourScheme (codeTokeniser->getDefaultColourScheme());
 
     setLineNumbersShown (true);
 

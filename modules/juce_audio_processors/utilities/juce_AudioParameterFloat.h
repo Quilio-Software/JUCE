@@ -133,6 +133,14 @@ public:
 
     /** Provides access to the parameter's range. */
     NormalisableRange<float> range;
+    
+    //WTF is going on here?
+    std::optional<float> tryDefaultValue()
+    {
+        return std::optional<float>{};
+    }
+    
+    float getDefaultValue() const override;
 
 protected:
     /** Override this method if you are interested in receiving callbacks
@@ -144,13 +152,13 @@ private:
     //==============================================================================
     float getValue() const override;
     void setValue (float newValue) override;
-    float getDefaultValue() const override;
+
     int getNumSteps() const override;
     String getText (float, int) const override;
     float getValueForText (const String&) const override;
-
+    
     std::atomic<float> value;
-    const float valueDefault;
+    const float valueDefault = 0.0f;
     std::function<String (float, int)> stringFromValueFunction;
     std::function<float (const String&)> valueFromStringFunction;
 

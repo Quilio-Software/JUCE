@@ -1395,6 +1395,7 @@ protected:
 
         [[nodiscard]] BusesProperties withInput  (const String& name, const AudioChannelSet& defaultLayout, bool isActivatedByDefault = true) const;
         [[nodiscard]] BusesProperties withOutput (const String& name, const AudioChannelSet& defaultLayout, bool isActivatedByDefault = true) const;
+        [[nodiscard]] BusesProperties withIndexedOutputs (const String& name, int numOutputs, const AudioChannelSet& defaultLayout, bool isActivatedByDefault = true) const;
     };
 
     /** Callback to query if adding/removing buses currently possible.

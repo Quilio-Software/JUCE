@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Graph Viewer</title>
+  <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; }
+    #cy { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="cy"></div>
+  <script>
+    function loadTreeJson() {
+      if (location.protocol !== 'file:') {
+        return fetch('./tree.json').then(r => {
+          if (!r.ok) throw new Error('Failed to fetch tree.json');
+          return r.json();
+        });
+      }
+      return new Promise((resolve, reject) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json,.json';
+        input.style.position = 'fixed';
+        input.style.top = '10px';
+        input.style.left = '10px';
+        input.style.zIndex = '9999';
+        input.title = 'Choose tree.json';
+        document.body.appendChild(input);
+        input.addEventListener('change', () => {
+          const f = input.files && input.files[0];
+          if (!f) return reject(new Error('No file chosen'));
+          const reader = new FileReader();
+          reader.onload = () => {
+            try { resolve(JSON.parse(reader.result)); }
+            catch (e) { reject(e); }
+          };
+          reader.onerror = reject;
+          reader.readAsText(f);
+        });
+      });
+    }
+
+    loadTreeJson().then(data => {
+      const allNodes = new Map();
+      const elements = [];
+
+      function extractNodeLabel(obj) {
+        if (obj.label && obj.label !== "\\N") return obj.label;
+        if (obj.name) return obj.name;
+        if (Array.isArray(obj._ldraw_)) {
+          for (const d of obj._ldraw_) {
+            if (Array.isArray(d) && d[0] === "T") return d[d.length - 1];
+            if (d && d.op === 'T' && typeof d.text === 'string') return d.text;
+          }
+        }
+        return String(obj._gvid);
+      }
+
+      if (Array.isArray(data.objects)) {
+        data.objects.forEach(obj => {
+          if (obj._gvid !== undefined) {
+            const id = String(obj._gvid);
+            const label = extractNodeLabel(obj);
+            allNodes.set(id, { id, label });
+            elements.push({ data: { id, label } });
+          }
+        });
+      }
+
+      const targets = new Set();
+      const childrenMap = new Map();
+      const parentOf = new Map();
+      if (Array.isArray(data.edges)) {
+        data.edges.forEach(e => {
+          const source = String(e.tail);
+          const target = String(e.head);
+          elements.push({ data: { source, target } });
+          targets.add(target);
+          if (!childrenMap.has(source)) childrenMap.set(source, []);
+          childrenMap.get(source).push(target);
+          parentOf.set(target, source);
+        });
+      }
+
+      const rootIds = [];
+      allNodes.forEach((node, id) => { if (!targets.has(id)) rootIds.push(id); });
+
+      const cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements,
+        style: [
+          { selector: 'node', style: {
+              'shape': 'round-rectangle',
+              'width': 'label',
+              'height': 'label',
+              'background-color': '#2f3b52',
+              'border-width': 1,
+              'border-color': '#9aa4b2',
+              'label': 'data(label)',
+              'font-size': 16,
+              'text-wrap': 'wrap',
+              'text-max-width': 150,
+              'padding': 6,
+              'text-valign': 'center',
+              'text-halign': 'center',
+              'color': '#fff'
+            } },
+          { selector: 'edge', style: {
+              'line-color': '#9aa4b2',
+              'target-arrow-shape': 'triangle',
+              'target-arrow-color': '#9aa4b2',
+              'arrow-scale': 0.9,
+              'curve-style': 'bezier'
+            } },
+          { selector: '.hidden', style: { 'display': 'none' } },
+          { selector: 'node.collapsed', style: { 'background-color': '#39465f' } }
+        ]
+      });
+
+      // Collapse everything except roots
+      cy.nodes().forEach(n => { n.data('collapsed', true); });
+      cy.batch(() => {
+        cy.nodes().forEach(n => { if (!rootIds.includes(n.id())) n.addClass('hidden'); });
+        cy.edges().addClass('hidden');
+      });
+
+      function collectDescendants(id, acc) {
+        if (!acc) acc = new Set();
+        const kids = childrenMap.get(id) || [];
+        for (const cid of kids) {
+          if (!acc.has(cid)) {
+            acc.add(cid);
+            collectDescendants(cid, acc);
+          }
+        }
+        return acc;
+      }
+
+      function runNeatLayout() {
+        const visNodes = cy.nodes(':visible');
+        const visEdges = cy.edges(':visible');
+        const vis = visNodes.union(visEdges);
+        if (!vis.length) return;
+
+        vis.layout({
+          name: 'fcose',
+          fit: true,
+          quality: 'default',
+          randomize: true,
+          nodeRepulsion: 2000,       // lower → less space between nodes
+          idealEdgeLength: 60,       // shorter edges → pulls nodes closer
+          edgeElasticity: 0.4,
+          gravity: 0.6,              // higher → pulls clusters together
+          gravityRangeCompound: 1.5,
+          gravityCompound: 1.0,
+          nodeDimensionsIncludeLabels: true,
+          animate: false
+        }).run();
+      }
+
+
+      function collapseBranch(rootChildId) {
+        const desc = collectDescendants(rootChildId);
+        cy.batch(() => {
+          desc.forEach(cid => cy.getElementById(cid).addClass('hidden'));
+          cy.edges().filter(e =>
+            desc.has(e.data('source')) || desc.has(e.data('target')) ||
+            (e.data('source') === rootChildId && desc.has(e.data('target')))
+          ).addClass('hidden');
+          cy.getElementById(rootChildId).data('collapsed', true).addClass('collapsed');
+        });
+      }
+
+      cy.on('tap', 'node', function(evt) {
+        const node = evt.target;
+        const id = node.id();
+        const isCollapsed = node.data('collapsed') === true;
+
+        if (!isCollapsed) {
+          // collapse
+          const desc = collectDescendants(id);
+          cy.batch(() => {
+            desc.forEach(cid => cy.getElementById(cid).addClass('hidden'));
+            cy.edges().filter(e =>
+              desc.has(e.data('source')) || desc.has(e.data('target')) ||
+              (e.data('source') === id && desc.has(e.data('target')))
+            ).addClass('hidden');
+            node.data('collapsed', true).addClass('collapsed');
+          });
+          runScatterLayout();
+        } else {
+          // expand
+          const kids = childrenMap.get(id) || [];
+          cy.batch(() => {
+            kids.forEach(cid => {
+              cy.getElementById(cid).removeClass('hidden');
+              cy.edges(`[source = "${id}"][target = "${cid}"]`).removeClass('hidden');
+            });
+            node.data('collapsed', false).removeClass('collapsed');
+          });
+          runScatterLayout();
+        }
+      });
+
+      // Expand roots initially
+      (function expandRootLevel() {
+        cy.batch(() => {
+          rootIds.forEach(rid => {
+            const rootNode = cy.getElementById(rid);
+            if (!rootNode) return;
+            const kids = childrenMap.get(rid) || [];
+            kids.forEach(cid => {
+              cy.getElementById(cid).removeClass('hidden');
+              cy.edges(`[source = "${rid}"][target = "${cid}"]`).removeClass('hidden');
+            });
+            rootNode.data('collapsed', false).removeClass('collapsed');
+          });
+        });
+        runScatterLayout();
+      })();
+    }).catch(err => {
+      console.error(err);
+      const msg = document.createElement('div');
+      msg.textContent = 'Failed to load tree.json. If opening this file directly, choose the JSON with the file picker.';
+      msg.style.position = 'fixed'; msg.style.bottom = '10px'; msg.style.left = '10px';
+      msg.style.padding = '8px 12px'; msg.style.background = '#222'; msg.style.color = '#fff';
+      document.body.appendChild(msg);
+    });
+  </script>
+</body>
+</html>

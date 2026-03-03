@@ -1186,6 +1186,19 @@ AudioProcessor::BusesProperties AudioProcessor::BusesProperties::withOutput (con
     return retval;
 }
 
+AudioProcessor::BusesProperties AudioProcessor::BusesProperties::withIndexedOutputs (const String& name,
+                                                                                     int numOutputs,
+                                                                                     const AudioChannelSet& dfltLayout,
+                                                                                     bool isActivatedByDefault) const
+{
+    auto retval = *this;
+    for (int i = 1; i <= numOutputs; i++)
+    {
+        retval.addBus (false, name + juce::String (" ") + juce::String (i), dfltLayout, isActivatedByDefault);
+    }
+    return retval;
+}
+
 //==============================================================================
 const char* AudioProcessor::getWrapperTypeDescription (AudioProcessor::WrapperType type) noexcept
 {
